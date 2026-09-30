@@ -114,7 +114,11 @@ async def _route_unpinned_start(info: "SubagentInfo", kind: str, sessions: Any) 
         return
     try:
         from kiro_crew.decisions.points import model_route
-        from kiro_crew.llm_helpers import provider_advertised_ids
+        from kiro_crew.llm_helpers import (
+            pick_epoch_host,
+            provider_advertised_ids,
+            provider_backend,
+        )
 
         if not model_route.derive_enabled():
             return
@@ -134,6 +138,7 @@ async def _route_unpinned_start(info: "SubagentInfo", kind: str, sessions: Any) 
             advertised=advertised,
             run_id=info.id,
             rate_of=model_route.rate_lookup(provider),
+            backend=provider_backend(provider) or provider_backend(pick_epoch_host(provider)),
         )
     except asyncio.CancelledError:
         raise

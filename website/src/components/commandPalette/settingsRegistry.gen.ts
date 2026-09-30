@@ -1941,6 +1941,18 @@ export const SETTINGS_REGISTRY: SettingEntry[] =
     }
   },
   {
+    "id": "developer.model-the-small-model-uses-to-rate-turns",
+    "label": "Model the small model uses to rate turns",
+    "labelKey": "pages.developer.featurePreviewsTab.decisions_route_judge_model",
+    "description": "Only used when the small model rates turns. Leave the default, the judge agent's own model, unless you want a cheaper one.",
+    "tab": "developer",
+    "type": "select",
+    "occurrence": 1,
+    "params": {
+      "sub": "feature-previews"
+    }
+  },
+  {
     "id": "developer.reply-threads-on-mate-chat-messages",
     "label": "Reply threads on mate chat messages",
     "labelKey": "pages.settings.crewmatesSection.reply_threads",
@@ -2016,6 +2028,18 @@ export const SETTINGS_REGISTRY: SettingEntry[] =
     "id": "developer.which-judge-answers",
     "label": "Which judge answers",
     "labelKey": "pages.developer.featurePreviewsTab.decisions_judge_provider",
+    "tab": "developer",
+    "type": "select",
+    "occurrence": 1,
+    "params": {
+      "sub": "feature-previews"
+    }
+  },
+  {
+    "id": "developer.which-judge-rates-the-turn",
+    "label": "Which judge rates the turn",
+    "labelKey": "pages.developer.featurePreviewsTab.decisions_route_judge_provider",
+    "description": "Jev sends the message to the address above, which the Decisions switch covers. The small model sends it to the model provider this machine already uses, so it needs no key and no extra agreement. Either judge only picks a difficulty level: the model each level runs on is set above, and nothing else is reachable. If the judge cannot answer, the turn keeps its session's model.",
     "tab": "developer",
     "type": "select",
     "occurrence": 1,

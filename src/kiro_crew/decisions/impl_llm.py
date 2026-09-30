@@ -51,7 +51,7 @@ import logging
 import math
 import re
 import uuid
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, NamedTuple
 
 from kiro_crew.decisions.types import Answer, Answers, Choice, Noul, Question, Score, is_model_id
 
@@ -80,9 +80,24 @@ JUDGE_MODEL_DEFAULT = "auto"
 #: anything of this size is a runaway generation, not an answer.
 _MAX_RESPONSE_CHARS = 64 * 1024
 
-#: The feature a judge call is audited and billed under: the SEL source of any
-#: refused tool request, and ``bg:wake_judge`` in the usage store.
-_SEL_SOURCE = "wake_judge"
+
+class JudgeSource(NamedTuple):
+    """Which decision point a call answers for, as the call's own records name it."""
+
+    #: The feature the call is audited and billed under: the SEL source of any
+    #: refused tool request, and ``bg:<sel_source>`` in the usage store.
+    sel_source: str
+    #: The config key the call's model came from, which a refusal of that model
+    #: names so the operator edits the field that holds it.
+    model_key: str
+    #: The asking session's backend. ``None`` leaves the existing wake-judge path
+    #: unchecked; a named backend must match the background runtime.
+    backend: str | None = None
+
+
+#: The wake judge's source, and the default for a caller that names none. Its
+#: ``sel_source`` is the label existing usage rows and SEL queries already carry.
+WAKE_JUDGE_SOURCE = JudgeSource("wake_judge", "decisions.nudge_wake.llm_model")
 
 #: How long one call's turn may stream. The gate's LLM budget never exceeds this,
 #: so it ends only a call the gate already stopped waiting for.
@@ -122,15 +137,20 @@ class LlmRunnerMissing(RuntimeError):
     """No runner is registered, so this lane cannot make a model call."""
 
 
+class LlmBackendMismatch(RuntimeError):
+    """The asking session and background runtime use different backends."""
+
+
 #: A prompt in, the model's raw text out. The one thing this module needs from the
 #: session layer, and the whole of it.
 Runner = Callable[[str], Awaitable[str]]
 
-#: A model id in, a runner for THAT model out. The gateway registers this rather
-#: than a bound runner, because the model the judge asks with is a live config
-#: value: ``decisions.nudge_wake.llm_model`` can change between two decisions, and
+#: A model id and the asking point's :class:`JudgeSource` in, a runner for THAT
+#: model, billed and warned about under that source, out. The gateway registers
+#: this rather than a bound runner, because the model a judge asks with is a live
+#: config value: a point's ``llm_model`` can change between two decisions, and
 #: a runner built once at boot would answer on whatever the model was then.
-RunnerFactory = Callable[[str], Runner]
+RunnerFactory = Callable[[str, JudgeSource], Runner]
 
 _runner: Runner | None = None
 _runner_factory: RunnerFactory | None = None
@@ -252,7 +272,9 @@ def _has_shared_runtime(sessions: Any) -> bool:
         return False
 
 
-def build_session_runner(sessions: Any, *, model: str = "") -> Runner:
+def build_session_runner(
+    sessions: Any, *, model: str = "", source: JudgeSource = WAKE_JUDGE_SOURCE
+) -> Runner:
     """A :data:`Runner` over the shared background runtime, where there is one.
 
     The gateway calls this with its session manager when it registers the factory.
@@ -272,7 +294,7 @@ def build_session_runner(sessions: Any, *, model: str = "") -> Runner:
     answer is dropped.
 
     *model* overrides the agent template's own model. It is validated here rather
-    than trusted, because it arrives from ``decisions.nudge_wake.llm_model`` in the
+    than trusted, because it arrives from the asking point's ``llm_model`` in the
     agent-writable config; anything that is not a model id is dropped and the
     agent's own model applies. So does :data:`JUDGE_MODEL_DEFAULT`, which IS the
     instruction to inherit rather than a model to ask for.
@@ -282,8 +304,8 @@ def build_session_runner(sessions: Any, *, model: str = "") -> Runner:
         # The CLASS of the problem, never the value: that field is agent-writable
         # and its content does not belong in a log line.
         logger.warning(
-            "decisions: decisions.nudge_wake.llm_model is not a model id; "
-            "the judge agent's own model is used instead"
+            "decisions: %s is not a model id; the judge agent's own model is used instead",
+            source.model_key,
         )
         resolved = ""
     if resolved == JUDGE_MODEL_DEFAULT:
@@ -292,6 +314,14 @@ def build_session_runner(sessions: Any, *, model: str = "") -> Runner:
         resolved = ""
 
     async def _run(prompt: str) -> str:
+        if source.backend is not None:
+            try:
+                configured_backend = sessions._configured_bg_backend()
+            except Exception:
+                raise LlmBackendMismatch("background backend is unreadable") from None
+            if not source.backend or source.backend != configured_backend:
+                raise LlmBackendMismatch("asking backend does not match background backend")
+
         # The session layer stays off this package's import graph, for the reason
         # `gate._oracle` documents: the package is reached from hot paths, and a
         # machine that decides without ever running a judge should not pay for it.
@@ -308,7 +338,7 @@ def build_session_runner(sessions: Any, *, model: str = "") -> Runner:
                 sessions,
                 prompt,
                 model=resolved or _background_role_model() or None,
-                sel_source=_SEL_SOURCE,
+                sel_source=source.sel_source,
                 timeout=_RUN_CEILING_SECS,
                 max_output_bytes=_MAX_RESPONSE_CHARS,
                 retry_rejected_model=False,
@@ -662,16 +692,23 @@ class LlmOracle:
     timeout and the fallback.
     """
 
-    def __init__(self, runner: Runner | None = None, *, model: str = "") -> None:
+    def __init__(
+        self,
+        runner: Runner | None = None,
+        *,
+        model: str = "",
+        source: JudgeSource = WAKE_JUDGE_SOURCE,
+    ) -> None:
         #: Injected for tests and for a caller that already holds one; ``None``
         #: resolves the registered runner at ASK time rather than at construction,
         #: so the gate can build an oracle before the gateway has registered one.
         self._runner = runner
-        #: The model the gate resolved for THIS decision, from
-        #: ``decisions.nudge_wake.llm_model``. Carried rather than read here so the
-        #: id the gate scrubbed and logged is the id actually asked for, and empty
-        #: means inherit the agent's own.
+        #: The model the gate resolved for THIS decision, from the asking point's
+        #: ``llm_model``. Carried rather than read here so the id the gate scrubbed
+        #: and logged is the id actually asked for, and empty means inherit the
+        #: agent's own.
         self._model = model
+        self._source = source
 
     async def ask(self, state: dict | str, questions: list[Question]) -> Answers:
         """One model call carrying every question. Raises on any failure.
@@ -685,7 +722,7 @@ class LlmOracle:
         # configured model, and the only one present in production.
         runner = self._runner or _runner
         if runner is None and _runner_factory is not None:
-            runner = _runner_factory(self._model)
+            runner = _runner_factory(self._model, self._source)
         if runner is None:
             raise LlmRunnerMissing("no judge runner is registered")
         prompt = render_prompt(state, questions)
