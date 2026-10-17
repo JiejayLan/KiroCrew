@@ -9,6 +9,7 @@ import { useLocalCrewHidden } from './overlayRoot'
 import { DOUBLE_TAP_MS, DOUBLE_TAP_SLOP, DOUBLE_TAP_ZOOM, usePinchZoom } from '../hooks/usePinchZoom'
 import { Btn, IconButton } from './ui'
 import { isEditableTarget } from '../utils/editableTarget'
+import { isInertSurface } from '../utils/inertSurface'
 import { overlayCaptionClearancePx } from '../lib/electron'
 
 /** Diagram zoom bounds. `1` is fit-to-viewport. The ceiling is higher than the
@@ -221,7 +222,7 @@ export default function DiagramLightbox({ svg, onClose }: { svg: string; onClose
   // listener. Also handle zoom keyboard shortcuts (+, -, 0).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (crewHidden) return
+      if (crewHidden || isInertSurface(dialogRef.current)) return
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()

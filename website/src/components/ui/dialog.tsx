@@ -4,6 +4,8 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { i18nT } from '../../i18n/t'
+import { isInertSurface } from '../../utils/inertSurface'
+import { mergeRefs } from '../../uiLocations/targetRegistry'
 import { GlobalOverlayScope } from '../overlayRoot'
 
 /**
@@ -73,17 +75,26 @@ interface DialogContentProps
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, maxWidth = 640, hideClose = false, overlayClassName, style, onKeyDown, ...props }, ref) => {
+>(({ className, children, maxWidth = 640, hideClose = false, overlayClassName, style, onKeyDown, onEscapeKeyDown, ...props }, ref) => {
   const trustRoot = useGuideTrustRootAttrs()
+  const contentRef = React.useRef<React.ComponentRef<typeof DialogPrimitive.Content> | null>(null)
+  const setContentRef = mergeRefs(contentRef, ref)
   return (
   <DialogPortal>
     <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
-      ref={ref}
+      ref={setContentRef}
       {...trustRoot}
       // Radix warns when this points at an id that does not exist. Callers that
       // want a description render a DialogDescription and set it themselves.
       aria-describedby={undefined}
+      onEscapeKeyDown={e => {
+        if (isInertSurface(contentRef.current)) {
+          e.preventDefault()
+          return
+        }
+        onEscapeKeyDown?.(e)
+      }}
       // The page's own global shortcuts must not fire while the user is typing
       // in here. `useKeyboardShortcuts` binds `document.addEventListener
       // ('keydown', ...)` in the BUBBLE phase, so without this a Cmd+, inside a

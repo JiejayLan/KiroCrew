@@ -79,6 +79,21 @@ describe('DiagramLightbox — Escape isolation (#20630)', () => {
       document.removeEventListener('keydown', capturing, { capture: true })
     }
   })
+
+  it('stands down while inert and leaves Escape for the scanner layer', () => {
+    const onClose = vi.fn()
+    render(<DiagramLightbox svg={svgWithViewBox()} onClose={onClose} />)
+    screen.getByRole('dialog').setAttribute('inert', '')
+    const scannerEscape = vi.fn()
+    document.addEventListener('keydown', scannerEscape, { capture: true })
+    try {
+      pressEscape()
+      expect(onClose).not.toHaveBeenCalled()
+      expect(scannerEscape).toHaveBeenCalledTimes(1)
+    } finally {
+      document.removeEventListener('keydown', scannerEscape, { capture: true })
+    }
+  })
 })
 
 describe('image Lightbox — Escape isolation (#20630)', () => {
@@ -118,6 +133,23 @@ describe('image Lightbox — Escape isolation (#20630)', () => {
       expect(capturing).toHaveBeenCalled()
     } finally {
       document.removeEventListener('keydown', capturing, { capture: true })
+    }
+  })
+
+  it('stands down while inert and leaves Escape for the scanner layer', () => {
+    openLightbox()
+    const image = screen.getByAltText('a')
+    const lightbox = image.parentElement?.parentElement
+    expect(lightbox).not.toBeNull()
+    lightbox!.setAttribute('inert', '')
+    const scannerEscape = vi.fn()
+    document.addEventListener('keydown', scannerEscape, { capture: true })
+    try {
+      pressEscape()
+      expect(screen.getByAltText('a')).toBeInTheDocument()
+      expect(scannerEscape).toHaveBeenCalledTimes(1)
+    } finally {
+      document.removeEventListener('keydown', scannerEscape, { capture: true })
     }
   })
 })

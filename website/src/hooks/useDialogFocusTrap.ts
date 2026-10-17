@@ -7,6 +7,7 @@
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
 import { useDocumentImeLatch } from './useImeGuard'
 import { useLocalCrewHidden } from '../components/overlayRoot'
+import { isInertSurface } from '../utils/inertSurface'
 
 /** Focusable descendants of a dialog, in DOM order, skipping disabled ones. */
 export const FOCUSABLE =
@@ -103,6 +104,8 @@ export function useDialogFocusTrap(
   useLayoutEffect(() => {
     if (!enabled || crewHidden) return
     const onKey = (e: KeyboardEvent) => {
+      const container = containerRef.current
+      if (isInertSurface(container)) return
       if (e.key === 'Escape' && handleEscape) {
         // An Escape the IME owns must not dismiss the dialog: the user is
         // cancelling a candidate list, not their part-filled form. `claimKey`
@@ -116,7 +119,6 @@ export function useDialogFocusTrap(
         onEscape()
         return
       }
-      const container = containerRef.current
       if (e.key !== 'Tab' || !container) return
       const items = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
         .filter((el) => el.offsetParent !== null)

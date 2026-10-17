@@ -200,6 +200,21 @@ describe('useDialogFocusTrap IME guard', () => {
     fireEvent.keyDown(last, { key: 'Escape' })
     expect(onEscape).toHaveBeenCalledTimes(1)
   })
+
+  it('stands down while its dialog is inert and leaves Escape propagating', () => {
+    const onEscape = vi.fn()
+    const { getByRole } = mount({ onEscape })
+    getByRole('dialog').setAttribute('inert', '')
+    const documentCapture = vi.fn()
+    document.addEventListener('keydown', documentCapture, { capture: true })
+    try {
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(onEscape).not.toHaveBeenCalled()
+      expect(documentCapture).toHaveBeenCalledTimes(1)
+    } finally {
+      document.removeEventListener('keydown', documentCapture, { capture: true })
+    }
+  })
 })
 
 /**

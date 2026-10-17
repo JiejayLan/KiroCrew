@@ -63,4 +63,28 @@ describe('ui/dialog — keyboard isolation', () => {
     fireEvent.keyDown(screen.getByLabelText('field'), { key: 'a' })
     expect(onKeyDown).toHaveBeenCalled()
   })
+
+  it('keeps an inert dialog open and leaves Escape for a later capture listener', () => {
+    const onOpenChange = vi.fn()
+    const onEscapeKeyDown = vi.fn()
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent aria-label="Test dialog" onEscapeKeyDown={onEscapeKeyDown}>
+          <DialogTitle>T</DialogTitle>
+          <input aria-label="field" />
+        </DialogContent>
+      </Dialog>,
+    )
+    screen.getByRole('dialog').setAttribute('inert', '')
+    const scannerEscape = vi.fn()
+    document.addEventListener('keydown', scannerEscape, { capture: true })
+    try {
+      fireEvent.keyDown(screen.getByLabelText('field'), { key: 'Escape' })
+      expect(onOpenChange).not.toHaveBeenCalled()
+      expect(onEscapeKeyDown).not.toHaveBeenCalled()
+      expect(scannerEscape).toHaveBeenCalledTimes(1)
+    } finally {
+      document.removeEventListener('keydown', scannerEscape, { capture: true })
+    }
+  })
 })

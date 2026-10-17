@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import { isInertSurface } from '../../utils/inertSurface'
 import { FONT_BODY } from './constants'
 
 const btn: CSSProperties = {
@@ -56,7 +57,7 @@ export function ConfirmDialog({
   useEffect(() => {
     confirmRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (isInertSurface(confirmRef.current) || e.key !== 'Escape') return
       e.preventDefault()
       e.stopPropagation()
       onCancel()
