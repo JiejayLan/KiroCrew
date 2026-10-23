@@ -1577,6 +1577,40 @@ def _runs_git_at_a_command_position(words: list[str]) -> bool:
     return False
 
 
+def command_names_git(cmd: str) -> bool:
+    """Whether ``cmd`` may run ``git``: the no-approver hook surface's fail-closed check.
+
+    Deliberately the crudest check there is: ``git`` anywhere in the text, with the
+    quotes and backslashes the shell removes taken out first and a line continuation
+    folded, refuses the command. No word, program or shell grammar is parsed, so no
+    quoting, escaping, path, ``.exe`` or wrapper spelling can place ``git`` outside it.
+    Spellings whose letters the shell writes itself are refused whatever they spell: an
+    ANSI-C ``$'...'`` (``$'\\x67it'``, also with quotes or backslashes between ``$`` and
+    ``'``), a glob character (``/usr/bin/g?t``), an extglob (``+(gi)t``) or a brace list,
+    read as any ``{`` and ``}`` with a ``,`` or ``..`` anywhere (``{g,}it``). A name built
+    at run time by an expansion or substitution (``${x}t``, ``$(printf g)it``, a
+    backtick), or by a program that writes and runs it (``base64 -d | sh``, ``python
+    -c``), is not seen; it keeps the default, like ``$EDITOR notes``. Every test is a
+    substring or one-character-class search, so the check stays linear in its input.
+    The cost is that a command that only mentions git in any token, or has a glob, is
+    refused too (``grep -rn git docs/``, ``grep digit``, ``rm *.tmp``); an operator lifts
+    that for the surface by granting the command in the hook's ``auto_approve_tools``.
+    """
+    folded = cmd.replace("\\\n", "")
+    bare = folded.replace('"', "").replace("\\", "")
+    braces = "{" in folded and "}" in folded and ("," in folded or ".." in folded)
+    if "$'" in bare or braces or _GLOB_CHAR_RE.search(folded) or _EXTGLOB_RE.search(folded):
+        return True
+    unquoted = folded.replace("'", "").replace('"', "")
+    readings = (cmd, unquoted.replace("\\", ""), unquoted.replace("\\", "/"))
+    return any("git" in text.casefold() for text in readings)
+
+
+#: A glob character: text whose letters the shell writes, so
+#: :func:`command_names_git` cannot read what program it names.
+_GLOB_CHAR_RE = re.compile(r"[*?\[]")
+
+
 def writes_through_redirect(cmd: str) -> bool:
     """Whether ``cmd`` writes through a redirect: :func:`_classify_bash`'s rule alone.
 
