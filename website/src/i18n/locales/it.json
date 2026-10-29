@@ -17500,6 +17500,7 @@
         "installed_theme_could_not_be_loaded": "Impossibile caricare il tema installato. Reinstallalo o scegli un altro tema.",
         "custom_theme_could_not_be_loaded": "Impossibile caricare questo tema. Scegli un altro tema o modifica questo.",
         "local_folder": "Cartella locale",
+        "zip_file": "File zip",
         "mode": "Modalità",
         "native_window_zoom_tip": "Zoom nativo della finestra, la stessa impostazione di {{mod}}+ / {{mod}}− (50%–300%). Viene mantenuto tra un avvio e l’altro.",
         "new_theme": "+ Nuovo tema",
@@ -17587,7 +17588,8 @@
         "desktop_app": "App desktop",
         "keep_running_when_window_closed": "Continua in background dopo la chiusura della finestra",
         "keep_running_when_window_closed_desc": "Chiudendo la finestra, {{productName}} viene nascosto e le sessioni e i lavori pianificati continuano. Disattiva l'opzione perché il pulsante di chiusura chiuda completamente l'app. Un gateway avviato da questa app si arresta con essa, mentre un gateway a cui si connette soltanto continua a funzionare.",
-        "keep_running_when_window_closed_save_failed": "Impossibile salvare questa impostazione. Non è cambiato nulla. Riprova."
+        "keep_running_when_window_closed_save_failed": "Impossibile salvare questa impostazione. Non è cambiato nulla. Riprova.",
+        "choose_zip_file": "Scegli un file .zip"
       },
       "importPanel": {
         "agent_data": "Dati dell'agente",

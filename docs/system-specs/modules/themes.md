@@ -113,13 +113,33 @@ cannot reach the hardcoded shadow value.
 
 ## Install Pipeline
 
-1. **Source** — a local directory (read in place, then copied into staging) or an https `github.com` repo
+1. **Source** — a local directory (read in place, then copied into staging), an
+   uploaded `.zip`, or an https `github.com` repo
    shallow-cloned server-side (`_clone_github`, `--depth 1`, 30s timeout, host
    allowlist). The clone spawns through the sandbox chokepoint, which fails
    **closed** where no OS sandbox backend exists: that refusal answers `503`
    with `code: "theme_install_sandbox_unavailable"`, never an unsandboxed
    retry — the URL is user-influenced and `git clone` executes remote content.
    A **local** source spawns nothing, so it stays available on such a host.
+   A **`.zip`** upload (`POST /api/themes/install-zip`, the archive as the body)
+   is how a browser that is not on the gateway host installs a pack: a folder
+   path names the gateway's filesystem, which a phone cannot reach.
+   `dashboard/theme_zip.py` unpacks it into a private temporary directory and
+   refuses what only an archive can express — a name that leaves the directory
+   (absolute, `:` in any component, `..`, backslash, or a target that does not
+   resolve under the directory), a symlink or other non-regular entry, a file
+   and a folder sharing one name, a path over six parts (even metadata),
+   an unreadable member, a member compressed
+   with anything but stored or deflate (`zipfile` decompresses a whole BZIP2 or
+   LZMA buffer at once, before any byte count sees it), more entries than the
+   largest tier allows (vetted by `zip_vet.vet_zip_inventory_bytes` before
+   `zipfile` parses the directory), or more unpacked bytes than it allows
+   (counted on the bytes written, not only the headers). Refusals answer `400`
+   with `code: "theme_zip_invalid"`; an empty body is `400` `theme_zip_empty`,
+   an oversized one `413` `theme_zip_too_large`. macOS metadata
+   (`__MACOSX/`, `._*`, `.DS_Store`) is skipped, and a pack wrapped in one
+   top-level folder is found inside it. The unpacked directory then goes through
+   the same local-source steps below; the governance gate is the same one.
 2. **Stage** — the source is copied into a private staging snapshot
    (`.install-staging-<token>`) via a per-file, symlink-rejecting,
    byte-bounded loop (`_copy_installed_theme`). The source dir remains
@@ -148,6 +168,7 @@ Registered by `dashboard/routes/themes.py` (`register`), except `GET /api/theme/
 | Method | Route | Purpose |
 |---|---|---|
 | `POST` | `/api/themes/install` | Install from local dir or GitHub (overwrite on re-install) |
+| `POST` | `/api/themes/install-zip` | Install from an uploaded `.zip` body (overwrite on re-install) |
 | `DELETE` | `/api/themes/{slug}` | Remove an installed theme |
 | `GET` | `/api/themes` | List custom + installed themes (the frontend adds built-ins) |
 | `GET` | `/api/themes/{slug}` | Theme detail + resolved `level` |
@@ -309,7 +330,7 @@ dashboard load into header-only round trips.
 | Loader | `website/src/hooks/useTheme.tsx` | Applies CSS vars; `applyThemeOverrides` → `scopeOverridesCss` + `rewriteOverridesUrls` (`themeCss.ts`); `injectThemeFonts`; pre-apply self-repair; `themeSwitching` state |
 | Render cache | `website/src/hooks/themeRenderCache.ts` | Persists the active pack's detail under `localStorage["mc-theme-data"]` and reads it back synchronously at `ThemeProvider` mount so the first paint is themed |
 | Experience layer | `website/src/components/ThemeExperienceLayer.tsx` | Mounts sandboxed overlay/topbar iframes + audio; enforces the postMessage allowlist |
-| Settings UI | `website/src/pages/settings/DisplayPanel.tsx` | Single Theme dropdown + install-from-local/GitHub + remove + "Applying…" status indicator; the "Enable experience" button for a declined Level-2 pack (`ThemeExperienceEnableButton.tsx`); the catalog-failure and unstyled-theme notices with Retry (see *Catalog failure* below) |
+| Settings UI | `website/src/pages/settings/DisplayPanel.tsx` | Single Theme dropdown + install-from-GitHub/local folder/uploaded `.zip` + remove + "Applying…" status indicator; the "Enable experience" button for a declined Level-2 pack (`ThemeExperienceEnableButton.tsx`); the catalog-failure and unstyled-theme notices with Retry (see *Catalog failure* below) |
 | Utility bridge | `website/src/tailwind-theme.css` | Tailwind v4 `@theme` mapping each utility (`bg-accent`, `text-muted/40`, `rounded-md`, `shadow-sm`, `font-mono`) onto the runtime CSS variable of the same stem, plus the `dark:` variant keyed on `[data-theme="dark"]`. A pack changes what a utility renders by writing the variable; it never touches this file. |
 
 ### Boot sequence: themed first paint

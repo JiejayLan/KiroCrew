@@ -16910,6 +16910,7 @@
         "installed_theme_could_not_be_loaded": "无法加载已安装的主题。重新安装，或选择其他主题。",
         "custom_theme_could_not_be_loaded": "无法加载此主题。选择其他主题，或编辑此主题。",
         "local_folder": "本地文件夹",
+        "zip_file": "Zip 文件",
         "mode": "模式",
         "native_window_zoom_tip": "原生窗口缩放，与 {{mod}}+ / {{mod}}− 是同一项设置（50%–300%）。重新启动后仍保留。",
         "new_theme": "+ 新建主题",
@@ -16997,7 +16998,8 @@
         "desktop_app": "桌面应用",
         "keep_running_when_window_closed": "关闭窗口后让应用在后台继续运行",
         "keep_running_when_window_closed_desc": "关闭窗口时隐藏 {{productName}}，会话和任务继续运行。关闭此选项后，关闭按钮将退出应用。由本应用启动的网关会随之停止，仅连接的网关会继续运行。",
-        "keep_running_when_window_closed_save_failed": "无法保存此设置。未做任何更改。请重试。"
+        "keep_running_when_window_closed_save_failed": "无法保存此设置。未做任何更改。请重试。",
+        "choose_zip_file": "选择 .zip 文件"
       },
       "importPanel": {
         "agent_data": "代理数据",

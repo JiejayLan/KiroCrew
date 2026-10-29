@@ -16910,6 +16910,7 @@
         "installed_theme_could_not_be_loaded": "インストール済みのテーマを読み込めませんでした。再インストールするか、別のテーマを選択してください。",
         "custom_theme_could_not_be_loaded": "このテーマを読み込めませんでした。別のテーマを選択するか、このテーマを編集してください。",
         "local_folder": "ローカルフォルダー",
+        "zip_file": "Zip ファイル",
         "mode": "モード",
         "native_window_zoom_tip": "ネイティブウィンドウのズーム（{{mod}}+ / {{mod}}− と同じ設定、50%〜300%）。次回起動後も保持されます。",
         "new_theme": "+ 新しいテーマ",
@@ -16997,7 +16998,8 @@
         "desktop_app": "デスクトップアプリ",
         "keep_running_when_window_closed": "ウィンドウを閉じてもアプリをバックグラウンドで実行し続ける",
         "keep_running_when_window_closed_desc": "ウィンドウを閉じると {{productName}} は非表示になり、セッションとジョブは実行を続けます。オフにすると、閉じるボタンでアプリが終了します。このアプリが起動したゲートウェイは一緒に停止し、接続しているだけのゲートウェイは実行を続けます。",
-        "keep_running_when_window_closed_save_failed": "この設定を保存できませんでした。何も変更されていません。もう一度お試しください。"
+        "keep_running_when_window_closed_save_failed": "この設定を保存できませんでした。何も変更されていません。もう一度お試しください。",
+        "choose_zip_file": ".zip ファイルを選択"
       },
       "importPanel": {
         "agent_data": "エージェントデータ",

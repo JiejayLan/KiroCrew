@@ -303,6 +303,46 @@ describe('DisplayPanel – theme install', () => {
     spy.mockRestore()
   })
 
+  it('picking "Zip file" installs the picked archive via api.installThemeZip', async () => {
+    // The folder-path source names a directory on the GATEWAY host, so a phone
+    // or a browser through a tunnel has nothing to type there. The zip source
+    // uploads the file the browser picked instead.
+    const setColorTheme = vi.fn()
+    mockUseTheme.mockImplementation(() => ({
+      ...DEFAULT_THEME,
+      setColorTheme,
+      loadCustomThemes: vi.fn().mockResolvedValue(true),
+    }))
+    const zipSpy = vi.spyOn(api, 'installThemeZip').mockResolvedValue({ ok: true, slug: 'haunted-crew' })
+    const pathSpy = vi.spyOn(api, 'installTheme')
+    renderPanel()
+
+    const trigger = screen.getByRole('combobox', { name: 'Theme source' })
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('option', { name: 'Zip file' }))
+    expect(trigger).toHaveTextContent('Zip file')
+    expect(screen.queryByLabelText('Theme source location')).not.toBeInTheDocument()
+
+    const install = screen.getByText('Install').closest('button')!
+    expect(install).toBeDisabled()
+
+    const file = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'haunted-crew.zip', {
+      type: 'application/zip',
+    })
+    fireEvent.change(screen.getByTestId('theme-zip-input'), { target: { files: [file] } })
+    expect(screen.getByRole('button', { name: 'haunted-crew.zip' })).toBeInTheDocument()
+    expect(install).toBeEnabled()
+
+    fireEvent.click(install)
+    await waitFor(() => expect(zipSpy).toHaveBeenCalledWith(file))
+    await waitFor(() => expect(setColorTheme).toHaveBeenCalledWith('custom-haunted-crew'))
+    expect(pathSpy).not.toHaveBeenCalled()
+    // A finished install clears the pick, so a second click cannot resend it.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose a .zip file' })).toBeInTheDocument())
+    zipSpy.mockRestore()
+    pathSpy.mockRestore()
+  })
+
   it('an install whose list refresh failed never selects the pack on its own', async () => {
     // Install lands, the list refresh fails: the notice under the picker says
     // so at once. When a catalog fetch later LANDS (Retry, a background refetch,

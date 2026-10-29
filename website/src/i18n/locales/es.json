@@ -17500,6 +17500,7 @@
         "installed_theme_could_not_be_loaded": "No se pudo cargar el tema instalado. Reinstálalo o elige otro tema.",
         "custom_theme_could_not_be_loaded": "No se pudo cargar este tema. Elige otro tema o edita este.",
         "local_folder": "Carpeta local",
+        "zip_file": "Archivo zip",
         "mode": "Modo",
         "native_window_zoom_tip": "Zoom nativo de la ventana, el mismo ajuste que {{mod}}+ / {{mod}}− (50%–300%). Se recuerda entre inicios.",
         "new_theme": "+ Tema nuevo",
@@ -17587,7 +17588,8 @@
         "desktop_app": "Aplicación de escritorio",
         "keep_running_when_window_closed": "Mantener la aplicación en segundo plano al cerrar la ventana",
         "keep_running_when_window_closed_desc": "Al cerrar la ventana, {{productName}} se oculta y tus sesiones y trabajos programados siguen en ejecución. Desactívalo para que el botón de cerrar cierre la aplicación por completo. Un gateway iniciado por esta aplicación se detiene con ella, y un gateway al que solo se conecta sigue en ejecución.",
-        "keep_running_when_window_closed_save_failed": "No se pudo guardar este ajuste. No se cambió nada. Inténtalo de nuevo."
+        "keep_running_when_window_closed_save_failed": "No se pudo guardar este ajuste. No se cambió nada. Inténtalo de nuevo.",
+        "choose_zip_file": "Elegir un archivo .zip"
       },
       "importPanel": {
         "agent_data": "Datos del agente",
