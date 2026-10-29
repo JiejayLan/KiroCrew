@@ -602,7 +602,12 @@ def _url_payload_command(n: int) -> str:
 #: takes the word a shell runs after the options and redirections that follow a shell's
 #: own ``-c`` (``bash -c -x '<script>'``). One forward scanner, its lazy per-position
 #: memos and the own-option-run scope; the reader only adds payloads. Re-measured.
-_PACKAGE_LINE_BUDGET = 33_334
+#: Raised by 108, from 33,334, for the ssh-to-self floor's glob program words: a glob
+#: that can name several ssh-family verbs is walked once per verb at its token
+#: (``_ssh_family_verbs``, ``_frame_verb_choices``), and nested payload, operand and
+#: hosts-file verdicts are shared for one outer call (``_shares_nested_verdicts``),
+#: plus nine manifest lines. The verdict stops depending on the hash seed.
+_PACKAGE_LINE_BUDGET = 33_442
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
