@@ -602,7 +602,12 @@ def _url_payload_command(n: int) -> str:
 #: takes the word a shell runs after the options and redirections that follow a shell's
 #: own ``-c`` (``bash -c -x '<script>'``). One forward scanner, its lazy per-position
 #: memos and the own-option-run scope; the reader only adds payloads. Re-measured.
-_PACKAGE_LINE_BUDGET = 33_334
+#: Raised by 320, from 33,334, for ``shell_normalizer._xargs_reconstructed_commands``:
+#: an xargs kill payload is rebuilt from every command that feeds its pipeline, with
+#: producer words flattened past glued separators, and the lexical half of that reading
+#: (separators, stages, operand words) lives in ``shell_normalizer_xargs`` with its own
+#: header and the re-export block. Deny-only: no allow widened.
+_PACKAGE_LINE_BUDGET = 33_654
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
