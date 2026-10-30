@@ -19,9 +19,27 @@ interface CollectionStatus {
   env_var?: string
   /** A `config.local.json` entry would make a successful write snap back. */
   overlay_override?: boolean
-  /** `telemetry.otlp_endpoint` is set, so enabling here would also export. */
+  /** An OTLP destination is configured, so enabling here would also export. */
   otlp_configured?: boolean
+  /** Each of those destinations by name (never its URL), in export order. */
+  otlp_destinations?: OtlpDestinationRow[]
   metrics_dir?: string
+}
+
+/** One row of `otlp_destinations`. `locked`: the build ships it and config cannot turn it off. */
+interface OtlpDestinationRow {
+  name: string
+  source?: string
+  locked?: boolean
+}
+
+/** The destination names as one line, a locked one marked as such. */
+function destinationNames(rows: OtlpDestinationRow[]): string {
+  return rows
+    .map(row => (row.locked
+      ? i18nT('pages.settings.privacyPanel.recordMetricsEgressLockedName', { name: row.name })
+      : row.name))
+    .join(', ')
 }
 
 /**
@@ -56,6 +74,7 @@ function MetricRecordingToggle() {
   const envPinned = !!statusQ.data?.env_pinned
   const overlayPinned = !!statusQ.data?.overlay_override
   const otlpConfigured = !!statusQ.data?.otlp_configured
+  const destinations = statusQ.data?.otlp_destinations ?? []
   // A configured egress endpoint pins the ENABLE direction only. Turning recording
   // OFF is exactly what a user on such a host most needs — the config route allows
   // it for that reason — so disabling the whole control here would strand them with
@@ -145,6 +164,15 @@ function MetricRecordingToggle() {
           {enabled
             ? i18nT('pages.settings.privacyPanel.recordMetricsEgressOn')
             : i18nT('pages.settings.privacyPanel.recordMetricsEgressOff')}
+          {/* Every destination by name, so a build's own collector is named next
+              to the operator's: the egress fact is incomplete without where. */}
+          {destinations.length > 0 && (
+            <span className="block mt-1">
+              {i18nT('pages.settings.privacyPanel.recordMetricsEgressDestinations', {
+                names: destinationNames(destinations),
+              })}
+            </span>
+          )}
         </p>
       )}
       {/* The pin reason, strongest-first: the env var is resolved inside the

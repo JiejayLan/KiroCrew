@@ -369,6 +369,22 @@ class OtlpDestination:
     (``metrics/destination_filter.py``), outside this descriptor: a destination
     declares the narrowing, the core performs it, and the wrapper rebuilds the
     batch rather than mutating SDK objects another exporter also reads.
+
+    ``headers``, ``headers_env`` and ``temporality`` describe how THIS
+    destination's exporter is built, for a destination declared as data (a
+    ``telemetry.otlp_endpoints`` entry) rather than in code with a ``session``.
+    They exist because a ``requests.Session`` per entry would be built on every
+    egress-posture read, which must stay cheap:
+
+    - ``headers`` -- fixed header name/value pairs sent with every export.
+    - ``headers_env`` -- header name -> ENVIRONMENT VARIABLE name. The core reads
+      each variable when it builds the exporter, so the value never sits on this
+      descriptor or in a config file. A variable that is unset or blank refuses
+      the destination: it gets no reader, and nothing else changes.
+    - ``temporality`` -- ``""`` (default) builds the reader exactly as the core
+      always has (``metrics.temporality.otlp_preference``); ``"delta"`` and
+      ``"cumulative"`` pin every instrument kind for this reader only, so
+      ``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`` cannot move it.
     """
 
     name: str
@@ -378,6 +394,9 @@ class OtlpDestination:
     allow: "Optional[frozenset[str]]" = None
     point_attributes: "Mapping[str, str]" = MappingProxyType({})
     resource_allow: "Optional[frozenset[str]]" = None
+    headers: "Mapping[str, str]" = MappingProxyType({})
+    headers_env: "Mapping[str, str]" = MappingProxyType({})
+    temporality: str = ""
 
 
 class FeedbackTrackerProvider(Protocol):
@@ -626,10 +645,19 @@ class TelemetryProvider(Protocol):
         ALONGSIDE (never instead of) the built-in local JSONL reader.  An empty
         sequence means local-only, with no network egress.
 
-        The public default returns one destination when
-        ``telemetry.otlp_endpoint`` is a non-empty string and nothing when it is
-        not, so a standalone build stays byte-identical to the hardcoded
-        endpoint-only exporter this replaced.  An edition overrides it to reach
+        The public default returns one destination per configured entry:
+        ``telemetry.otlp_endpoint`` first when it is a non-empty string (with no
+        narrowing, byte-identical to the endpoint-only exporter this replaced),
+        then each enabled ``telemetry.otlp_endpoints`` entry
+        (``metrics/otlp_endpoints.py``).  Nothing when neither is set.
+
+        An edition that overrides it and should keep the operator's entries
+        returns ``metrics.otlp_endpoints.config_destinations(cfg)`` first and its
+        own destinations after; an override that does not call it drops them.  A
+        destination returned here from code is not config, so config cannot remove
+        or turn it off: that is how a build ships a collector that is on by
+        default and locked.  It still obeys every gate below, and the Privacy
+        panel lists it as set by the build.  An edition overrides it to reach
         its own collector — including one whose credential ROTATES during
         process lifetime, which the once-at-construction
         ``OTEL_EXPORTER_OTLP_HEADERS`` injection cannot express.
