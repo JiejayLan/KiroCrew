@@ -72,7 +72,7 @@ vi.mock('../pages/chat/ChatSettings', () => ({
 // `chatSlots` is a STABLE spy, unlike the proxy's per-access `vi.fn()`: the
 // provisional-lineage test asserts on whether the sidebar came back for a second
 // read, which a fresh mock per property access cannot record.
-const mocks = vi.hoisted(() => ({ folders: [] as unknown[], chatSlots: vi.fn(), navigate: vi.fn(), crewWorkersFail: false, crewWorkersNotServed: false, roster: [] as unknown[], rosterFails: false, membersCalls: 0, lastMembers: null as Promise<unknown> | null }))
+const mocks = vi.hoisted(() => ({ folders: [] as unknown[], chatSlots: vi.fn(), navigate: vi.fn(), crewWorkersFail: false, crewWorkersNotServed: false, crewWorkersRows: null as unknown[] | null, roster: [] as unknown[], rosterFails: false, membersCalls: 0, lastMembers: null as Promise<unknown> | null }))
 
 // The router is real (MemoryRouter below); only `useNavigate` is a spy, so a row that
 // leaves the chat page can be asked WHERE it went rather than inferred from a route
@@ -91,6 +91,7 @@ vi.mock('../api/client', () => ({
       // The root row's summary reads the server's groups (the worker list API).
       if (p === 'crewWorkers' && mocks.crewWorkersFail) return vi.fn().mockRejectedValue(new Error('down'))
       if (p === 'crewWorkers' && mocks.crewWorkersNotServed) return vi.fn().mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }))
+      if (p === 'crewWorkers' && mocks.crewWorkersRows) return vi.fn().mockResolvedValue({ root: 'k-root', workers: mocks.crewWorkersRows })
       if (p === 'crewWorkers') return vi.fn().mockResolvedValue({ root: 'k-root', workers: [
         { key: 'k-w1', title: 'W1', agent: '', status: 'idle', group: 'done', last_activity: '', ledger_item: '', created_by: 'k-root' },
         { key: 'k-w2', title: 'W2', agent: '', status: 'needs_approval', group: 'approval', last_activity: '', ledger_item: '', created_by: 'k-root' },
@@ -216,6 +217,7 @@ beforeEach(() => {
   mocks.navigate.mockReset()
   mocks.crewWorkersFail = false
   mocks.crewWorkersNotServed = false
+  mocks.crewWorkersRows = null
 })
 afterEach(() => {
   vi.clearAllMocks()
@@ -253,13 +255,13 @@ describe('chat sidebar — conductor lane', () => {
     await waitFor(() => {
       const counts = within(container.querySelector('[data-crew-root="true"]') as HTMLElement).getByTestId('crew-root-counts')
       // The words live in the accessible name and tooltip; the row shows the count.
-      expect(counts).toHaveAccessibleName('2 sessions · 0 running')
-      expect(counts).toHaveAttribute('title', '2 sessions · 0 running')
+      expect(counts).toHaveAccessibleName('2 sessions')
+      expect(counts).toHaveAttribute('title', '2 sessions')
       expect(counts).toHaveTextContent(/^2$/)
       // The session count wears the chat icon, not the ghost.
       expect(counts.querySelector('.lucide-message-square')).not.toBeNull()
       expect(within(counts).queryByTestId('kiro-ghost-mark')).toBeNull()
-      // No running dot while nothing runs.
+      // No running dot: the crew's working count says that.
       expect(within(counts).queryByTestId('crew-root-running-dot')).toBeNull()
     })
     expect(within(container.querySelector('[data-crew-root="true"]') as HTMLElement).queryByTestId('crew-worker-stack')).toBeNull()
@@ -282,7 +284,7 @@ describe('chat sidebar — conductor lane', () => {
     expect(getByTestId('crew-root-summary')).not.toHaveTextContent('Needs your answer')
   })
 
-  it('reads "Running" with a green dot and the running count while a crew member works', async () => {
+  it('reads "Running" with the working count, and no second running dot, while a crew member works', async () => {
     // The live rows stand in for a gateway that serves no crew list.
     mocks.crewWorkersNotServed = true
     const slots = [
@@ -290,11 +292,52 @@ describe('chat sidebar — conductor lane', () => {
       { key: 'k-w1', title: 'W1', messages: 2, running: true, modified: 3000, created_by: 'k-root', crew_root: 'k-root' },
     ]
     const { getByTestId } = renderSidebar(slots, [], null, {}, [], slots)
-    await waitFor(() => expect(getByTestId('crew-root-counts')).toHaveAccessibleName('1 session · 1 running'))
+    await waitFor(() => expect(getByTestId('crew-root-counts')).toHaveAccessibleName('1 session'))
     expect(getByTestId('crew-root-state')).toHaveTextContent(/^Running$/)
     const counts = getByTestId('crew-root-counts')
-    expect(within(counts).getByTestId('crew-root-running-dot')).toBeInTheDocument()
-    expect(counts).toHaveTextContent(/^11$/)
+    // One number for the busy workers: the working count, not a second running dot.
+    expect(within(counts).queryByTestId('crew-root-running-dot')).toBeNull()
+    expect(counts).toHaveTextContent(/^1$/)
+    expect(getByTestId('crew-root-breakdown')).toHaveAccessibleName('1 working')
+  })
+
+  it('counts the crew on the root row: working, waiting and needs you, each its own glyph and a number', async () => {
+    mocks.crewWorkersNotServed = true
+    const slots = [
+      { key: 'k-root', title: 'Crew root', agent: 'kirocrew-conductor', messages: 1, running: false, modified: 4000, crew_mode_root: true },
+      { key: 'k-w1', title: 'W1', messages: 2, running: true, modified: 3000, created_by: 'k-root', crew_root: 'k-root' },
+      // A question sits with the conductor: it counts as working, never as needs you.
+      { key: 'k-w2', title: 'W2', messages: 2, running: false, needs_input: true, modified: 2900, created_by: 'k-root', crew_root: 'k-root' },
+      { key: 'k-w3', title: 'W3', messages: 2, running: false, modified: 2800, created_by: 'k-root', crew_root: 'k-root' },
+      { key: 'k-w4', title: 'W4', messages: 2, running: false, pending_approval: true, modified: 2700, created_by: 'k-root', crew_root: 'k-root' },
+    ]
+    const { getByTestId } = renderSidebar(slots, [], null, {}, [], slots)
+    await waitFor(() => expect(getByTestId('crew-root-breakdown')).toHaveAccessibleName('2 working, 1 waiting, and 1 needs you'))
+    // A glyph of its own and a number each, no words: the words are each count's tooltip.
+    const parts = within(getByTestId('crew-root-breakdown')).getAllByTestId('crew-root-count')
+    expect(parts.map(p => [p.getAttribute('data-bucket'), p.textContent, p.getAttribute('title'), p.querySelector('svg')?.getAttribute('class')?.match(/lucide-(loader|hourglass|triangle-alert)\b/)?.[1]])).toEqual([
+      ['working', '2', '2 working', 'loader'], ['waiting', '1', '1 waiting', 'hourglass'], ['needs_you', '1', '1 needs you', 'triangle-alert'],
+    ])
+    // Working wears the running green, so it reads in the dark theme too.
+    expect(parts[0].className).toContain('text-[var(--ok)]')
+    // The loader turns only where motion is allowed.
+    expect(parts[0].querySelector('svg')?.getAttribute('class')).toContain('motion-safe:animate-spin')
+    expect(parts[0].querySelector('svg')?.getAttribute('class')).not.toMatch(/(^|\s)animate-spin/)
+    expect(getByTestId('crew-root-breakdown')).toHaveAttribute('title', '2 working, 1 waiting, and 1 needs you')
+    // A count that does not fit is dropped whole, never cut in half.
+    expect(getByTestId('crew-root-breakdown').className).toContain('flex-wrap')
+    expect(getByTestId('crew-root-breakdown').className).toContain('overflow-hidden')
+  })
+
+  it('shows no counts when every crew member is done', async () => {
+    mocks.crewWorkersRows = [
+      { key: 'k-w1', title: 'W1', agent: '', status: 'idle', group: 'done', last_activity: '', ledger_item: '', created_by: 'k-root' },
+      { key: 'k-w2', title: 'W2', agent: '', status: 'idle', group: 'done', last_activity: '', ledger_item: '', created_by: 'k-root' },
+    ]
+    const slots = [{ key: 'k-root', title: 'Crew root', agent: 'kirocrew-conductor', messages: 1, running: false, modified: 4000, crew_mode_root: true }]
+    const { getByTestId, queryByTestId } = renderSidebar(slots, [], null, {}, [], slots)
+    await waitFor(() => expect(getByTestId('crew-root-counts')).toHaveAccessibleName('2 sessions'))
+    expect(queryByTestId('crew-root-breakdown')).toBeNull()
   })
 
   it('marks the root row as the parent while one of its unlisted workers is in the pane', async () => {
@@ -403,6 +446,8 @@ describe('chat sidebar — conductor lane', () => {
     renderSidebar(slots, [], null, {}, [], slots)
     await waitFor(() => expect(screen.getByTestId('crew-root-state')).toHaveTextContent(/^Needs you$/))
     expect(screen.queryByTestId('crew-root-counts')).toBeNull()
+    // No crew: no worker counts either.
+    expect(screen.queryByTestId('crew-root-breakdown')).toBeNull()
   })
 
   it('maps queued work to Waiting, never Done, and keeps its line as the tooltip', () => {

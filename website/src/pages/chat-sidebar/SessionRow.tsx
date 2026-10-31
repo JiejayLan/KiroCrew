@@ -49,7 +49,8 @@ import { useSlotTitleGenerating } from '../../hooks/slotTitleGeneration'
 import { DisclosureChevron, isOpenInTabModifierClick } from './chrome'
 import { SessionSourceChips } from './SessionSourceChips'
 import { CrewEyebrow } from '../../components/crew/CrewModeMarks'
-import { summarizeCrewWorkers } from '../../lib/crewWorkers'
+import { summarizeCrewWorkers, crewRowCounts, CREW_GROUP_TONE, type CrewRowCount } from '../../lib/crewWorkers'
+import { fmtList, fmtNumber } from '../../i18n/format'
 import { useCrewWorkerSummary } from '../chat/command-center/CrewWorkerList'
 import { crewWaitingApprovals, openedSessionRunning } from '../chat/command-center/model'
 import ErrorNotice from '../../components/ErrorNotice'
@@ -295,20 +296,43 @@ export function crewRowOwnState(key: string | undefined, title: string, loopStal
   return null
 }
 
+/** Each row count's glyph: a shape of its own, so it reads without colour. The
+ *  loader of a running row, the hourglass of queued work, and an exclamation
+ *  mark for what the person owes. */
+const CREW_ROW_COUNT_ICON: Record<CrewRowCount['bucket'], ReactNode> = {
+  // Still under reduced motion.
+  working: <Loader size={ROW_ICON_PX} className="shrink-0 motion-safe:animate-spin" aria-hidden />,
+  waiting: <Hourglass size={ROW_ICON_PX} className="shrink-0" aria-hidden />,
+  needs_you: <TriangleAlert size={ROW_ICON_PX} className="shrink-0" aria-hidden />,
+}
+
+/** Working wears the green the row's running marks use, which reads in both
+ *  themes; the other counts wear their group's tone. */
+const CREW_ROW_COUNT_TONE: Partial<Record<CrewRowCount['bucket'], string>> = { working: 'text-[var(--ok)]' }
+
+/** Each row count's words: "2 working", "1 waiting", "1 needs you". */
+const CREW_ROW_COUNT_KEY: Record<CrewRowCount['bucket'], string> = {
+  working: 'components.crewMode.ultra_row_count_working',
+  waiting: 'components.crewMode.ultra_row_count_waiting',
+  needs_you: 'components.crewMode.ultra_row_count_needs_you',
+}
+
 function CrewRootSummaryLine({ root, fallback, own = null }: { root: string; fallback: ReactNode; own?: CrewRowOwnState | null }) {
   // The server's groups (the worker list API), so the row, the panel and the
   // breadcrumb agree; the fallback until the list has answered. A failed poll
   // says so in the row's own status line; the next poll clears it. The left
-  // side is one state word, never cut; the right side is a ghost with the
-  // session count and, while any run, a green dot with the running count. The
-  // words "sessions" and "running" live in its tooltip and accessible name.
+  // side is one state word, never cut; then the crew's counts (working,
+  // waiting, needs you); the right side is the session count. The words live
+  // in the tooltips and accessible names.
   const { lastWorkers, failed } = useCrewWorkerSummary(root)
   // Only tool approvals reach the person; a worker's question is its conductor's.
   const { groups, approval, done, total } = summarizeCrewWorkers(lastWorkers ?? [])
   const running = groups.filter(g => g === 'working').length
+  const breakdown = crewRowCounts(groups).map(c => ({ ...c, text: i18nT(CREW_ROW_COUNT_KEY[c.bucket], { count: c.count }) }))
+  const breakdownLabel = fmtList(breakdown.map(c => c.text))
   // No crew yet: the row's own state still reads as one word; with none, the fallback line.
   if (total === 0 && !failed && !own) return <>{fallback}</>
-  const counts = i18nT('components.crewMode.ultra_row_sessions', { count: total, running })
+  const counts = i18nT('components.crewMode.ultra_row_sessions', { count: total })
   const [word, tone] = own ? [own.word, own.tone]
     : approval > 0 ? [i18nT('components.crewMode.ultra_needs_you'), 'crew-tone-warn font-medium']
     : running > 0 ? [i18nT('commandCenter.running'), 'text-text']
@@ -323,14 +347,26 @@ function CrewRootSummaryLine({ root, fallback, own = null }: { root: string; fal
       ) : (
         <span className={`shrink-0 whitespace-nowrap text-[12px] ${tone}`} data-testid="crew-root-state" title={own?.title || undefined}>{word}</span>
       )}
+      {breakdown.length > 0 && (
+        // Whole counts only: one that does not fit wraps onto a hidden second
+        // line instead of being cut in half. The full sentence is the label.
+        <span className="min-w-0 flex flex-wrap content-start items-center h-4 overflow-hidden" data-testid="crew-root-breakdown" role="img" aria-label={breakdownLabel} title={breakdownLabel}>
+          {/* A zero-width first item holds the first line, so even the first
+              count wraps away whole when the line is too narrow for it. */}
+          <span aria-hidden="true" className="w-0 h-4" />
+          {/* A glyph and a number each; the words are the tooltip and the label. */}
+          {breakdown.map(c => (
+            <span key={c.bucket} title={c.text} data-testid="crew-root-count" data-bucket={c.bucket}
+              className={`inline-flex items-center gap-0.5 mr-1.5 h-4 text-[12px] whitespace-nowrap tabular-nums ${CREW_ROW_COUNT_TONE[c.bucket] ?? CREW_GROUP_TONE[c.group]}`}>
+              {CREW_ROW_COUNT_ICON[c.bucket]}<span>{fmtNumber(c.count)}</span>
+            </span>
+          ))}
+        </span>
+      )}
       {total > 0 && (
         <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-[12px] tabular-nums crew-tone-muted" data-testid="crew-root-counts" title={counts} aria-label={counts} role="img">
           <MessageSquare size={11} aria-hidden="true" className="inline-block shrink-0 ultra-accent" />
           <span aria-hidden="true">{total}</span>
-          {running > 0 && <>
-            <span aria-hidden="true" className="ml-1 w-1.5 h-1.5 rounded-full bg-[var(--ok)]" data-testid="crew-root-running-dot" />
-            <span aria-hidden="true">{running}</span>
-          </>}
         </span>
       )}
     </div>
