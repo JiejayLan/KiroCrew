@@ -483,11 +483,10 @@ AGENT_AUTH_DECLARATIONS: Tuple[AgentAuthDeclaration, ...] = (
         # environment").
         adapter_own_leaves=(),
         sign_in_remedy=(
-            "The Strands harness reaches its model with the provider settings Kiro Crew "
-            "holds for it. Save a key under Settings → Secrets and map it in "
-            "agent.strands_env under the name the provider reads (ANTHROPIC_API_KEY, "
-            "OPENAI_API_KEY, GEMINI_API_KEY, AWS_BEARER_TOKEN_BEDROCK, ...). Bedrock "
-            "also works through the standard AWS credential chain."
+            "Set the provider and its key in Settings → Agent Harness → Strands, under "
+            "Model provider; the key is kept in Settings → Secrets and mapped in "
+            "agent.strands_env. Kiro Crew hides ~/.aws from the agent, so Bedrock "
+            "needs a Bedrock API key and its region."
         ),
         signed_out_message=(
             "The Strands harness has no model credential. Save a key under Settings > "
