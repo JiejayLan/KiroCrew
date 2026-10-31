@@ -936,6 +936,7 @@
     "pages.settings.instancesPanel.not_active_until_restart": "Tail of the sentence \"Remote crew management is enabled\", shown when the setting is on but the app has not restarted yet. Keep the leading dash; agree in gender with the translated subject (\"management\").",
     "pages.settings.notificationsPanel.priority_critical": "Notification priority level in a per-channel select: the alert always interrupts. Adjective describing a priority, not a severity of a bug.",
     "pages.settings.notificationsPanel.priority_default": "Notification priority level in a per-channel select: the normal level. Adjective describing a priority.",
-    "pages.settings.notificationsPanel.priority_passive": "Notification priority level in a per-channel select: the alert is only recorded in history, never interrupts and is not counted on the bell. Adjective describing a priority; a word like \"quiet\" is fine."
+    "pages.settings.notificationsPanel.priority_passive": "Notification priority level in a per-channel select: the alert is only recorded in history, never interrupts and is not counted on the bell. Adjective describing a priority; a word like \"quiet\" is fine.",
+    "pages.schedulePage.type_token_to_confirm": "Instruction above the bulk-delete confirm input. <token/> is replaced by the literal word the user must type (it is never translated); keep the <token/> tag and place it where your word order needs it. 'Type' is the imperative verb."
   }
 }
