@@ -257,6 +257,9 @@ class HooksConfig:
     #: ``auto_approve_tools`` grant. Empty by default: nothing changes unless the
     #: operator lists something.
     confirm_tools: list[str] = field(default_factory=list)
+    #: The batch write guard (``acp.batch_guard``): refuse a write-class tool call
+    #: sent in the same parallel batch as a read-class call. Off by default.
+    batch_write_guard: bool = False
     #: Set when the load could not read a config file that names
     #: ``confirm_tools`` (``governance.confirm_tools_unknown``), whatever list it
     #: kept. The gate then withholds every ``auto_approve_tools`` grant, since the
@@ -364,6 +367,9 @@ class HooksConfig:
             ),
             auto_deny_tools=_str_list(data.get("auto_deny_tools", [])),
             confirm_tools=_str_list(data.get("confirm_tools", [])),
+            # Only a real ``true`` turns it on: the guard refuses calls, so a
+            # malformed value keeps it off.
+            batch_write_guard=data.get("batch_write_guard", False) is True,
             auto_replies=auto_replies,
             transforms=transforms,
             context_rules=context_rules,
@@ -392,6 +398,7 @@ class HooksConfig:
             "auto_approve_subagent_tools": self.auto_approve_subagent_tools,
             "auto_deny_tools": list(self.auto_deny_tools),
             "confirm_tools": list(self.confirm_tools),
+            "batch_write_guard": self.batch_write_guard,
             "auto_replies": [asdict(h) for h in self.auto_replies],
             "transforms": [asdict(h) for h in self.transforms],
             "context_rules": [asdict(r) for r in self.context_rules],

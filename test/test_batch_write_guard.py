@@ -49,8 +49,15 @@ def _guard():
 # ── frames ──
 
 
-def _tool_call_frame(call_id: str, tool_name: str, raw_input: dict, *, kind: str = "",
-                     server: str = "", title: str = "") -> JsonRpcMessage:
+def _tool_call_frame(
+    call_id: str,
+    tool_name: str,
+    raw_input: dict,
+    *,
+    kind: str = "",
+    server: str = "",
+    title: str = "",
+) -> JsonRpcMessage:
     kiro: dict = {"toolName": tool_name}
     if server:
         kiro["mcpServerName"] = server
@@ -63,9 +70,7 @@ def _tool_call_frame(call_id: str, tool_name: str, raw_input: dict, *, kind: str
     }
     if kind:
         update["kind"] = kind
-    return JsonRpcMessage(
-        method="session/update", params={"sessionId": "s1", "update": update}
-    )
+    return JsonRpcMessage(method="session/update", params={"sessionId": "s1", "update": update})
 
 
 def _settled_frame(call_id: str, status: str = "completed") -> JsonRpcMessage:
@@ -84,13 +89,23 @@ def _settled_frame(call_id: str, status: str = "completed") -> JsonRpcMessage:
 
 
 def _read_frame(call_id: str = "tc-read") -> JsonRpcMessage:
-    return _tool_call_frame(call_id, "shell", {"command": "gh pr view 7 --json headRefOid"},
-                            kind="execute", title="Running: gh pr view 7")
+    return _tool_call_frame(
+        call_id,
+        "shell",
+        {"command": "gh pr view 7 --json headRefOid"},
+        kind="execute",
+        title="Running: gh pr view 7",
+    )
 
 
 def _write_frame(call_id: str = "tc-write") -> JsonRpcMessage:
-    return _tool_call_frame(call_id, "shell", {"command": "gh pr merge 7 --squash"},
-                            kind="execute", title="Running: gh pr merge 7 --squash")
+    return _tool_call_frame(
+        call_id,
+        "shell",
+        {"command": "gh pr merge 7 --squash"},
+        kind="execute",
+        title="Running: gh pr merge 7 --squash",
+    )
 
 
 def _write_permission(request_id: int, call_id: str = "tc-write") -> AcpEvent:
@@ -344,8 +359,10 @@ def _with_steer(transport, monkeypatch):
         steered.append(text)
         return True
 
-    send = transport._send_response if hasattr(transport, "_send_response") else (
-        transport._runtime.send_response
+    send = (
+        transport._send_response
+        if hasattr(transport, "_send_response")
+        else (transport._runtime.send_response)
     )
 
     async def _send(*args, **kwargs):
