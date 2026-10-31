@@ -1216,6 +1216,13 @@
       "hint": "Render programming ligatures (=>, !=, ->) when the custom font has them. Code and diffs in messages are unaffected."
     },
     {
+      "id": "display.explore",
+      "label": "Explore",
+      "tab": "display",
+      "route": "/settings/display/view?highlight=display.explore",
+      "hint": "Show Explore in the top bar and a Try today card on a new chat."
+    },
+    {
       "id": "display.external-terminal-app",
       "label": "External terminal app",
       "tab": "display",

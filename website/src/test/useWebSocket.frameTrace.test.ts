@@ -547,6 +547,18 @@ describe('useWebSocket frame routing trace', () => {
     expect(got).toEqual(EXPECTED_FRAMES[name])
   })
 
+  it('chat_done in the active slot refreshes Explore once it has been read (session-keyed)', async () => {
+    const { ws } = await mountOpen()
+    // What useMilestones caches: the key carries the session.
+    qc.setQueryData(['milestones', `dashboard:${ACTIVE}`], { enabled: true })
+    act(() => { ws.frame({ type: 'chat_chunk', data: { slot: ACTIVE, seq: 1, content: 'answer' } }) })
+    act(() => { drainFrames() })
+    trace = []
+    act(() => { ws.frame({ type: 'chat_done', data: { slot: ACTIVE, ts: TS } }) })
+    act(() => { drainFrames() })
+    expect(trace).toContain('query invalidateQueries ["milestones"]')
+  })
+
   it('swallows a malformed frame and keeps routing the next one', async () => {
     const { ws } = await mountOpen()
     act(() => {
