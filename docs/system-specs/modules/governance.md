@@ -2681,8 +2681,8 @@ switched off. Two fields keep that honest:
 only POSTURE — set `mode`, entry COUNTS (`allow_count`/`deny_count`),
 capability `enabled` + inner scope names, ordinal `floor` — and NEVER the rule
 CONTENTS (the allow/deny globs, command patterns). This is deliberate: the
-dashboard is reachable by the agent's own browser tooling (`playwright-cli attach
---extension` drives the user's authenticated Chrome), and `security_policy.json` /
+dashboard is reachable by the agent's own browser tooling (the `browser` tool
+drives the user's own Chrome through the gateway relay), and `security_policy.json` /
 `profiles` are on the `is_sensitive_path` keystone, so the agent's file tools refuse
 to read them and no sandbox mode lets the agent write them (they are OS read-only).
 They are still OS-readable by design, so posture-only serialization is
@@ -2762,8 +2762,8 @@ denials leave the same forensic trail.
   through the same effective-deny floor as `on_tool_call` is tracked as its own
   follow-up; do not describe computer-use governance as covering it.
 - **Raster capture has two channels and neither is governed.** Computer use has no
-  `observations` scope any more, and `playwright-cli screenshot` is a shell command
-  rather than a tool call, so an `mcp` deny cannot reach it at all. A fleet that
+  `observations` scope any more, and the `browser` tool's `screenshot` op sits
+  behind `capabilities.browse`, not behind computer-use governance. A fleet that
   means "no raster capture" must deny `@kirocrew-computer` via the `mcp` scope
   **and** the browser CLI via the `commands` scope.
 - **The `mcp`-scope deny is the only per-tool governance lever over computer use, and
@@ -2851,11 +2851,9 @@ materialised by narrowing the `acp_backends` registry at gateway start),
 (ordinal floor at `wrap_argv`), `approval_mode` (boot floor only), and every capability
 gate — `capabilities.spawn`, `capabilities.messaging`, `capabilities.cron`,
 `capabilities.memory_writes`, `capabilities.script_hooks`,
-`capabilities.browse` (the native `browser` MCP tool's dispatch chokepoint —
-default on; a deny makes the tool refuse outright, and it does NOT fall back to
-`playwright-cli`. The `playwright-cli` fallback path itself remains governed by
-the `commands` scope, so denying browsing wholesale means denying both this
-capability AND the `playwright-cli` command),
+`capabilities.browse` (the `browser` MCP tool's dispatch chokepoint — default
+on; a deny makes the tool refuse outright, and it never falls back to another
+driver, so denying this capability denies browsing wholesale),
 `capabilities.publish` (artifact publish chokepoint — see below),
 `capabilities.agentcore` (opt-in agent workload identity + Gateway MCP —
 see below),

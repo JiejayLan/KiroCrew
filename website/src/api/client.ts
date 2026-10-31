@@ -68,9 +68,21 @@ import { createAgentChannelsEndpoints } from './client/agentChannels'
 import { createAppsEndpoints } from './client/apps'
 import { createArtifactsEndpoints } from './client/artifacts'
 import { createBrowserAndComputerUseEndpoints } from './client/browserAndComputerUse'
+export type {
+  BrowserKind,
+  BrowserConnection,
+  BrowserCredentialsStatus,
+  BrowserStatusData,
+  BrowserTestData,
+  BrowserInstallRequest,
+  BrowserInstallJob as BrowserHarnessInstallJob,
+  KiroChromiumState,
+} from './client/browserHarness'
+import { createBrowserHarnessEndpoints } from './client/browserHarness'
 import { createDecisionsEndpoints } from './client/decisions'
 import { createMessagingEndpoints } from './client/messaging'
 import { createAutoResearchEndpoints } from './client/autoResearch'
+import { createBrowserLiveEndpoints } from './client/browserLive'
 import type { DecisionsConsentData } from './client/decisions'
 
 export type { TunnelStatus } from './client/system'
@@ -223,14 +235,7 @@ export type {
   FileMenuContext,
 } from './client/apps'
 export type { AppPublishProvider, DeploySitesResponse } from './client/artifacts'
-export { browserInstallConflictJob } from './client/browserAndComputerUse'
 export type {
-  BrowserInstallData,
-  BrowserEngine,
-  BrowserEngineStatus,
-  BrowserInstallJob,
-  BrowserViewData,
-  BrowserOpenData,
   ComputerUsePermissions,
   ComputerUseConfigData,
   ComputerUseConfigSave,
@@ -1436,9 +1441,11 @@ const agentChannels = createAgentChannelsEndpoints(transport)
 const apps = createAppsEndpoints(transport)
 const artifacts = createArtifactsEndpoints(transport)
 const browserAndComputerUse = createBrowserAndComputerUseEndpoints(transport)
+const browserHarness = createBrowserHarnessEndpoints(transport)
 const decisions = createDecisionsEndpoints(transport)
 const messaging = createMessagingEndpoints(transport)
 const autoResearch = createAutoResearchEndpoints(transport)
+const browserLive = createBrowserLiveEndpoints(transport)
 
 // Spread in the order the methods have always had, so the key order is
 // unchanged. A key two segments both defined would silently take the later
@@ -1574,6 +1581,7 @@ export const api = {
     ).then(jRemoteBrowse),
   ...artifacts.remoteAndComments,
   ...browserAndComputerUse.hostAutomation,
+  ...browserHarness.browserHarness,
   ...decisions.consentRead,
   // Defined here rather than in ./client/decisions: decisions.md names this
   // module as the home of the optional-`enabled` consent write.
@@ -1620,4 +1628,5 @@ export const api = {
   ...apps.fileMenu,
   ...artifacts.publishing,
   ...featureDiscovery.tips,
+  ...browserLive.browserLive,
 }

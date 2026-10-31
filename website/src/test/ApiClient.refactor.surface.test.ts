@@ -180,9 +180,9 @@ const API_KEY_ORDER = [
   'unpublishArtifact', 'reprobeArtifactNotice', 'sandboxDocUrl', 'artifactDownloadUrl', 'refreshArtifactSharing',
   'pullLatest', 'upstreamStatus', 'overwriteRemote', 'artifactComments',
   'postArtifactComment', 'replyArtifactComment', 'markCommentReview', 'resolveComment',
-  'reopenComment', 'deleteArtifactComment', 'editArtifactComment', 'getBrowserInstall',
-  'setBrowserToken', 'installBrowserCli', 'installBrowserEngine', 'getBrowserView',
-  'startBrowserView', 'openInBrowser', 'getComputerUseConfig', 'saveComputerUseConfig',
+  'reopenComment', 'deleteArtifactComment', 'editArtifactComment',
+  'getComputerUseConfig', 'saveComputerUseConfig',
+  'getBrowserStatus', 'installBrowserHarness', 'testBrowser', 'disconnectBrowser',
   'getDecisionsConsent', 'getDecisionsProvider', 'getDecisionsLocalRuntime', 'saveDecisionsConsent', 'saveDecisionsScope',
   'saveDecisionsHistoryBudget', 'sendDecisionsFeedback', 'saveDecisionsProvider', 'removeDecisionsLocalModel', 'getSlackConfig', 'getSlackManifest', 'getSlackManifestStatus', 'saveSlackConfig',
   'getDiscordConfig', 'saveDiscordConfig', 'getTelegramConfig', 'saveTelegramConfig',
@@ -197,7 +197,9 @@ const API_KEY_ORDER = [
   'researchKnowledgeStatus', 'researchToArtifact', 'researchReportStatus', 'researchReport',
   'researchDelete', 'invokeFileMenuItem', 'artifactTeardown', 'publishProviders',
   'publishArtifactToCoreProvider', 'publishToProvider', 'deploySites', 'tipsNext', 'tipsStatus',
-  'tipsFeedback',
+  'tipsFeedback', 'browserLiveVisibility', 'browserLiveAck', 'browserInputClaim', 'browserInputRelease',
+  'browserInputEvent', 'browserLiveOpenInBrowser', 'browserLiveReopen', 'browserAskAnswer', 'browserLiveClose',
+  'browserLiveRecordings', 'browserLiveRecording',
 ]
 
 const NESTED_KEY_ORDER: Record<string, string[]> = {
