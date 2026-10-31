@@ -143,7 +143,6 @@ def _shell(command: str) -> AcpEvent:
         "git push -u origin feat/x",
         "git -C /w commit -m 'msg'",
         "cd /w && git commit -F msg.txt",
-        "cr --new-review",
         "aws --profile p --region us-west-2 dynamodb put-item --table-name t",
         "aws s3 cp a.txt s3://bucket/a.txt",
         "aws lambda invoke --function-name f out.json",
@@ -168,12 +167,56 @@ def test_clearly_write_shell_commands_are_write_class(command):
         "aws logs filter-log-events --log-group-name g",
         "ls -la && cat README.md",
         "python3 -m pytest -q test/test_x.py",
-        "echo cr is a word here",
+        "echo example-review-tool upload is a phrase here",
+        # Not a write until an operator lists it (see the extra-prefix tests).
+        "example-review-tool upload --new-review",
     ],
 )
 def test_every_other_shell_command_is_read_class(command):
     guard = _guard()
     assert guard.classify(_shell(command)) == guard.READ
+
+
+_EXTRA = ("example-review-tool upload",)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "example-review-tool upload --new-review",
+        "cd /w && example-review-tool upload",
+        "X=1 /opt/bin/example-review-tool upload -r 3",
+        "timeout 60 example-review-tool upload",
+    ],
+)
+def test_an_operator_listed_prefix_is_write_class(command):
+    guard = _guard()
+    assert guard.classify(_shell(command), _EXTRA) == guard.WRITE
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "example-review-tool status",
+        "echo example-review-tool upload",
+        "example-review-tool",
+    ],
+)
+def test_an_operator_prefix_matches_whole_leading_words_only(command):
+    guard = _guard()
+    assert guard.classify(_shell(command), _EXTRA) == guard.READ
+
+
+def test_the_built_in_table_names_no_extra_write_commands():
+    from kiro_crew.hook_runtime.hook_types import HooksConfig
+
+    assert HooksConfig.from_dict({}).batch_write_guard_commands == []
+    assert HooksConfig.from_dict(
+        {"batch_write_guard_commands": ["example-review-tool upload", "", 3]}
+    ).batch_write_guard_commands == ["example-review-tool upload"]
+    assert (
+        HooksConfig.from_dict({"batch_write_guard_commands": "x"}).batch_write_guard_commands == []
+    )
 
 
 @pytest.mark.parametrize(
@@ -390,7 +433,7 @@ _TRANSPORTS = [
 @pytest.mark.parametrize("make_transport", _TRANSPORTS)
 async def test_transport_refuses_a_write_batched_with_a_read(tmp_path, monkeypatch, make_transport):
     guard = _guard()
-    monkeypatch.setattr(guard, "guard_enabled", lambda: True)
+    monkeypatch.setattr(guard, "guard_settings", lambda: (True, ()))
     transport = make_transport(tmp_path)
     order, steered = _with_steer(transport, monkeypatch)
     _feed(transport, _read_frame())
@@ -414,7 +457,7 @@ async def test_transport_approves_the_same_write_once_the_read_returned(
     tmp_path, monkeypatch, make_transport
 ):
     guard = _guard()
-    monkeypatch.setattr(guard, "guard_enabled", lambda: True)
+    monkeypatch.setattr(guard, "guard_settings", lambda: (True, ()))
     transport = make_transport(tmp_path)
     _feed(transport, _read_frame())
     _feed(transport, _settled_frame("tc-read"))
@@ -431,7 +474,7 @@ async def test_transport_with_the_guard_off_approves_as_before(
     tmp_path, monkeypatch, make_transport
 ):
     guard = _guard()
-    monkeypatch.setattr(guard, "guard_enabled", lambda: False)
+    monkeypatch.setattr(guard, "guard_settings", lambda: (False, ()))
     transport = make_transport(tmp_path)
     _feed(transport, _read_frame())
     _feed(transport, _write_frame())
@@ -440,18 +483,56 @@ async def test_transport_with_the_guard_off_approves_as_before(
     assert await transport.approve_tool(43) is True
 
 
+def _tool_frame(call_id: str, command: str) -> JsonRpcMessage:
+    return _tool_call_frame(
+        call_id, "shell", {"command": command}, kind="execute", title=f"Running: {command}"
+    )
+
+
+def _shell_permission(request_id: int, call_id: str, command: str) -> AcpEvent:
+    return AcpEvent(
+        kind=EVENT_PERMISSION_REQUEST,
+        request_id=request_id,
+        tool_call_id=call_id,
+        title=f"Running: {command}",
+        tool_kind="execute",
+        is_shell=True,
+        tool_input=json.dumps({"command": command}),
+    )
+
+
 @pytest.mark.asyncio
-async def test_guard_enabled_reads_the_hooks_setting(monkeypatch):
+@pytest.mark.parametrize("make_transport", _TRANSPORTS)
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [pytest.param(_EXTRA, False, id="listed"), pytest.param((), True, id="not-listed")],
+)
+async def test_transport_applies_the_operators_extra_write_commands(
+    tmp_path, monkeypatch, make_transport, extra, expected
+):
+    guard = _guard()
+    monkeypatch.setattr(guard, "guard_settings", lambda: (True, extra))
+    transport = make_transport(tmp_path)
+    command = "example-review-tool upload --new-review"
+    _feed(transport, _read_frame())
+    _feed(transport, _tool_frame("tc-upload", command))
+    transport._permission_gate_events[44] = _shell_permission(44, "tc-upload", command)
+
+    assert await transport.approve_tool(44) is expected
+
+
+@pytest.mark.asyncio
+async def test_guard_settings_read_the_hooks_section(monkeypatch):
     guard = _guard()
     from kiro_crew.config import KiroCrewConfig
 
     class _Cfg:
-        hooks = {"batch_write_guard": True}
+        hooks = {"batch_write_guard": True, "batch_write_guard_commands": list(_EXTRA)}
 
     monkeypatch.setattr(KiroCrewConfig, "load", classmethod(lambda cls: _Cfg()))
-    assert guard.guard_enabled() is True
+    assert guard.guard_settings() == (True, _EXTRA)
     _Cfg.hooks = {}
-    assert guard.guard_enabled() is False
+    assert guard.guard_settings() == (False, ())
 
 
 def test_demo_refusal_text():

@@ -24,8 +24,10 @@ Three parts:
   not dropped); the transport then rejects through its floor-refusal branch.
 
 Opt-in: ``hooks.batch_write_guard`` in config.json, default off (see
-:func:`guard_enabled`). It is a discipline guard, not a security control: the
-security floor runs first and is unchanged.
+:func:`guard_settings`). ``hooks.batch_write_guard_commands`` (empty by default)
+lists extra write-command prefixes for tools only a local install knows. It is a
+discipline guard, not a security control: the security floor runs first and is
+unchanged.
 """
 
 from __future__ import annotations
@@ -47,7 +49,8 @@ __all__ = [
     "WRITE",
     "BatchWindow",
     "classify",
-    "guard_enabled",
+    "classify_command",
+    "guard_settings",
     "screen_approval",
 ]
 
@@ -188,14 +191,29 @@ def _aws_is_write(words: list[str]) -> bool:
     return not positional[1].lower().startswith(_AWS_READ_OP_PREFIXES)
 
 
-def classify_command(command: str) -> str:
-    """READ or WRITE for a shell command line."""
+def _prefix_words(extra_write_commands: tuple[str, ...]) -> list[list[str]]:
+    prefixes = []
+    for prefix in extra_write_commands:
+        words = _segment_words(prefix.strip()) if isinstance(prefix, str) else []
+        if words:
+            prefixes.append(words)
+    return prefixes
+
+
+def classify_command(command: str, extra_write_commands: tuple[str, ...] = ()) -> str:
+    """READ or WRITE for a shell command line.
+
+    *extra_write_commands* are the operator's own write-command prefixes
+    (``hooks.batch_write_guard_commands``), matched word by word against the
+    start of each segment's program words, for tools this table does not know.
+    """
     for pattern in _WRITE_SHELL_PATTERNS:
         if pattern.search(command):
             return WRITE
+    prefixes = _prefix_words(extra_write_commands)
     for segment in _SEGMENT_SPLIT.split(command):
         words = _segment_words(segment.strip())
-        # Skip leading env assignments and simple wrappers, so ``X=1 cr`` and
+        # Skip leading env assignments and simple wrappers, so ``X=1 tool`` and
         # ``timeout 60 aws ...`` are judged by their program.
         while words and ("=" in words[0] and not words[0].startswith("-")):
             words = words[1:]
@@ -206,7 +224,8 @@ def classify_command(command: str) -> str:
         if not words:
             continue
         program = words[0].rsplit("/", 1)[-1]
-        if program == "cr":
+        program_words = [program, *words[1:]]
+        if any(program_words[: len(p)] == p for p in prefixes):
             return WRITE
         if program == "aws" and _aws_is_write(words):
             return WRITE
@@ -232,8 +251,11 @@ def _command_of(event: Any) -> str:
     return command if isinstance(command, str) else ""
 
 
-def classify(event: Any) -> str:
-    """READ, WRITE, or ``""`` (not guarded) for one tool-call event."""
+def classify(event: Any, extra_write_commands: tuple[str, ...] = ()) -> str:
+    """READ, WRITE, or ``""`` (not guarded) for one tool-call event.
+
+    *extra_write_commands* reaches :func:`classify_command` for a shell call.
+    """
     server, name = _tool_identity(event)
     if server:
         if (server, name) in _WRITE_MCP_TOOLS:
@@ -244,7 +266,7 @@ def classify(event: Any) -> str:
     if name:
         builtin = KIRO_TOOL_ALIASES.get(name, name)
         if builtin in _SHELL_BUILTINS:
-            return classify_command(_command_of(event))
+            return classify_command(_command_of(event), extra_write_commands)
         if builtin in _WRITE_BUILTINS:
             return WRITE
         if builtin in _READ_BUILTINS:
@@ -256,7 +278,7 @@ def classify(event: Any) -> str:
             return WRITE
         return ""
     if getattr(event, "is_shell", False):
-        return classify_command(_command_of(event))
+        return classify_command(_command_of(event), extra_write_commands)
     kind = str(getattr(event, "tool_kind", "") or "")
     if kind in _READ_KINDS:
         return READ
@@ -301,11 +323,17 @@ class BatchWindow:
         self._members.clear()
         self._open.clear()
 
+    def read_peers(self, call_id: str) -> int:
+        """How many OTHER members of *call_id*'s batch are reads (0 when unseen)."""
+        if call_id not in self._members:
+            return 0
+        return sum(1 for cid, k in self._members.items() if cid != call_id and k == READ)
+
     def refusal_for(self, call_id: str, klass: str) -> str | None:
         """The refusal for approving *call_id* (class *klass*), or ``None``."""
-        if klass != WRITE or call_id not in self._members:
+        if klass != WRITE:
             return None
-        reads = sum(1 for cid, k in self._members.items() if cid != call_id and k == READ)
+        reads = self.read_peers(call_id)
         if not reads:
             return None
         return (
@@ -334,34 +362,46 @@ def note_settled(window: BatchWindow | None, call_id: str) -> None:
 # ── Approval ──
 
 
-def guard_enabled() -> bool:
-    """Whether ``hooks.batch_write_guard`` is on. Off when config cannot be read."""
+def guard_settings() -> tuple[bool, tuple[str, ...]]:
+    """``(enabled, extra write-command prefixes)`` from the ``hooks`` section.
+
+    ``hooks.batch_write_guard`` turns the guard on; ``hooks.batch_write_guard_commands``
+    adds the operator's own write-command prefixes to the shell table. Off, with no
+    extras, when config cannot be read.
+    """
     try:
         from kiro_crew import hooks as hooks_mod
         from kiro_crew.config import KiroCrewConfig
 
-        return hooks_mod.HooksConfig.from_dict(KiroCrewConfig.load().hooks).batch_write_guard
+        config = hooks_mod.HooksConfig.from_dict(KiroCrewConfig.load().hooks)
+        return config.batch_write_guard, tuple(config.batch_write_guard_commands)
     except Exception:
         logger.debug("batch guard: config unreadable; guard off", exc_info=True)
-        return False
+        return False, ()
 
 
 async def screen_approval(transport: Any, event: Any) -> str | None:
     """The guard's refusal for approving *event* on *transport*, or ``None``.
 
     When it refuses, the reason has already been steered into the running turn,
-    so the caller only audits and rejects. Synchronous checks first; the config
-    read happens only for a call the window would refuse.
+    so the caller only audits and rejects. The synchronous window check runs
+    first; config is read only for a call that shares its batch with a read. The
+    call itself is classified with the operator's extra write commands; its peers
+    were classified without them when they were dispatched.
     """
     import asyncio
 
     window = getattr(transport, "_batch_window", None)
     if window is None or event is None:
         return None
-    reason = window.refusal_for(str(getattr(event, "tool_call_id", "") or ""), classify(event))
-    if reason is None:
+    call_id = str(getattr(event, "tool_call_id", "") or "")
+    if not window.read_peers(call_id):
         return None
-    if not await asyncio.to_thread(guard_enabled):
+    enabled, extra_write_commands = await asyncio.to_thread(guard_settings)
+    if not enabled:
+        return None
+    reason = window.refusal_for(call_id, classify(event, extra_write_commands))
+    if reason is None:
         return None
     from kiro_crew.deny_notice import steer_refusal_notice
 

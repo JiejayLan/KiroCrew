@@ -1353,8 +1353,11 @@ judged. `batch_guard.classify` reads the harness-stamped identity (never the
 title) against explicit tables: file-write built-ins and Kiro Crew's own
 ledger, report and send tools are writes, file-read built-ins and Kiro Crew's own
 read tools are reads, a shell command is a write only for `gh pr|issue
-merge/create/review/comment/...`, `git push|commit`, `cr`, and a non-read `aws`
-operation, and any other tool is neither, so it is never refused and never
+merge/create/review/comment/...`, `git push|commit`, a non-read `aws`
+operation, and a command starting with one of the operator's own prefixes in
+`hooks.batch_write_guard_commands` (empty by default; matched whole words, read
+only for the call being approved, so a peer dispatched earlier was classified
+without it), and any other tool is neither, so it is never refused and never
 causes a refusal. A refusal steers its reason into the running turn with cause
 `DENY_CAUSE_BATCH_READ_WRITE` while the request is still unanswered, then takes
 the floor-refusal branch (audit row, `reject_tool`, `False`). Calls an agent spec
