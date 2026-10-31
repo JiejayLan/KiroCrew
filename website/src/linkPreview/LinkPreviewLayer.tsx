@@ -18,6 +18,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import ErrorNotice from '../components/ErrorNotice'
+import { activeElementIsEditable, isEditableTarget } from '../utils/editableTarget'
 import { useFrameLinkBridge } from '../hooks/useFrameLinkBridge'
 import { i18nT } from '../i18n/t'
 import { resolveLinkPreviews, providerFor, type ResolvedLinkPreview } from './linkPreviewRegistry'
@@ -31,6 +32,17 @@ export const RETRY_AFTER_MS = 30_000
 function currentTheme(): 'dark' | 'light' {
   const root = document.documentElement
   return root.classList.contains('dark') || /dark/.test(root.dataset.theme ?? '') ? 'dark' : 'light'
+}
+
+/** The URL a provider is shown by default: no query and no fragment, which can
+ *  carry signed tokens or other secrets. `fullUrl` in the manifest opts out. */
+export function withoutQuery(href: string): string {
+  try {
+    const u = new URL(href)
+    return `${u.origin}${u.pathname}`
+  } catch {
+    return ''
+  }
 }
 
 function selectProviders(d: unknown): ResolvedLinkPreview[] {
@@ -126,7 +138,7 @@ export default function LinkPreviewLayer() {
       const el = path.find((n): n is HTMLAnchorElement => n instanceof HTMLAnchorElement && Boolean(n.href))
       if (el) {
         const p = providerFor(el.href, providersRef.current)
-        return p ? { a: el as HTMLElement, url: el.href as string | undefined, text: undefined as string | undefined, p } : null
+        return p ? { a: el as HTMLElement, url: (p.fullUrl ? el.href : withoutQuery(el.href)) as string | undefined, text: undefined as string | undefined, p } : null
       }
       // A plain-text match: the owner is re-derived from the span's own text, and
       // the provider gets that text and nothing else.
@@ -195,8 +207,9 @@ export default function LinkPreviewLayer() {
       // A card's own shortcuts (pin, copy): only a plain key, only while the
       // dashboard is not taking text, and only to a card that is showing.
       if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.key.length !== 1) return
-      const t = document.activeElement
-      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+      // Shadow-aware: the code editor's editable node sits inside a shadow root,
+      // where `document.activeElement` only reports its host.
+      if (isEditableTarget(e) || activeElementIsEditable()) return
       host.forwardKey(e)
     }
     // Scrolling the chat moves the link away from its card. Scrolling inside a
